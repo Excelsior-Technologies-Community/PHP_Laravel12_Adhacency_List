@@ -399,6 +399,9 @@ PHP_Laravel12_Adhacency_List/
 
 Your **PHP_Laravel12_Adhacency_List** Project is now ready!
 
+<<<<<<< HEAD
 
 
 
+=======
+>>>>>>> development
