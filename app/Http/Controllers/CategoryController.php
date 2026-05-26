@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
-    // Show tree + search
     public function index(Request $request)
     {
         $query = Category::query();
@@ -21,17 +20,14 @@ class CategoryController extends Controller
         return view('categories.index', compact('categories'));
     }
 
-    // Show create form
     public function create()
     {
         $categories = Category::all();
         return view('categories.create', compact('categories'));
     }
 
-    // Store
     public function store(Request $request)
     {
-        // ✅ Validation
         $request->validate([
             'name' => 'required|string|max:255'
         ]);
@@ -41,19 +37,68 @@ class CategoryController extends Controller
             'parent_id' => $request->parent_id
         ]);
 
-        return redirect('/categories')
-            ->with('success', '✅ Category Added Successfully!');
+        return redirect('/categories')->with('success', 'Category Added Successfully!');
     }
 
-    // Delete (Soft Delete)
+    public function edit($id)
+    {
+        $category = Category::findOrFail($id);
+        
+        $breadcrumbs = $category->ancestorsAndSelf()->pluck('name')->implode(' > ');
+        
+        $categories = Category::where('id', '!=', $id)->get(); 
+
+        return view('categories.edit', compact('category', 'categories', 'breadcrumbs'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'parent_id' => 'nullable|exists:categories,id'
+        ]);
+
+        $category = Category::findOrFail($id);
+
+        if ($request->parent_id) {
+            $descendants = $category->descendants()->pluck('id')->toArray();
+            if (in_array($request->parent_id, $descendants) || $id == $request->parent_id) {
+                return back()->with('error', 'Invalid move: cannot move into its own sub-category!');
+            }
+        }
+
+        $category->update([
+            'name' => $request->name,
+            'parent_id' => $request->parent_id
+        ]);
+
+        return redirect('/categories')->with('success', 'Category Updated Successfully!');
+    }
+
+    public function move(Request $request)
+    {
+        $category = Category::findOrFail($request->id);
+        
+        if ($request->parent_id) {
+            $descendants = $category->descendants()->pluck('id')->toArray();
+            if (in_array($request->parent_id, $descendants) || $category->id == $request->parent_id) {
+                return response()->json(['success' => false, 'message' => 'Invalid Move']);
+            }
+        }
+
+        $category->parent_id = $request->parent_id;
+        $category->save();
+
+        return response()->json(['success' => true]);
+    }
+
     public function destroy($id)
     {
         Category::findOrFail($id)->delete();
 
-        return back()->with('success', '🗑 Category Moved to Trash!');
+        return back()->with('success', 'Category Moved to Trash!');
     }
 
-    // Trash list
     public function trash()
     {
         $categories = Category::onlyTrashed()->get();
@@ -61,15 +106,13 @@ class CategoryController extends Controller
         return view('categories.trash', compact('categories'));
     }
 
-    // Restore
     public function restore($id)
     {
         Category::withTrashed()->findOrFail($id)->restore();
 
-        return back()->with('success', '♻️ Category Restored Successfully!');
+        return back()->with('success', 'Category Restored Successfully!');
     }
 
-    // Toggle status
     public function toggle($id)
     {
         $cat = Category::findOrFail($id);
@@ -77,6 +120,6 @@ class CategoryController extends Controller
         $cat->status = !$cat->status;
         $cat->save();
 
-        return back()->with('success', '🔄 Status Updated Successfully!');
+        return back()->with('success', 'Status Updated Successfully!');
     }
 }
